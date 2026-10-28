@@ -1,0 +1,58 @@
+# ═══════════════════════════════════════════════════════════════════
+#  Fly-in (42) · estrategia E2 · pyproject.toml
+#  Python >= 3.10 · 0 dependencias de runtime · tooling: flake8 + mypy + pytest
+# ═══════════════════════════════════════════════════════════════════
+
+# ── 1. Build system ── ¿quién empaqueta el proyecto? ────────────────
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# ── 2. Metadatos del proyecto (PEP 621) ── ¿qué soy? ────────────────
+[project]
+name = "fly-in"
+version = "0.1.0"
+description = "42 Fly-in multi-drone routing over capacitated weighted graph"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [{ name = "Luis Aviles" }]
+# Runtime deps = []: stdlib only. El subject prohíbe networkx/graphlib.
+dependencies = []
+
+# ── 3. Entry point CLI ── `fly-in maps/...` → flyin.cli:main ────────
+[project.scripts]
+fly-in = "flyin.cli:main"
+
+# ── 4. Dependencias de desarrollo (PEP 735) ── `uv sync` las instala ─
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=5.0",
+    "mypy>=1.10",
+    "flake8>=7.0",
+]
+
+# ── 5. Empaquetado en layout src/ ── hatchling necesita esta pista ───
+[tool.hatch.build.targets.wheel]
+packages = ["src/flyin"]
+
+# ── 6. mypy ── flags base del subject (`--strict` se pasa en el Makefile) ─
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+ignore_missing_imports = true
+disallow_untyped_defs = true
+check_untyped_defs = true
+
+# ── 7. pytest ── dónde mirar y cómo correr ──────────────────────────
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+
+# ── 8. coverage ── opcional, para medir la suite del validador ──────
+[tool.coverage.run]
+source = ["src/flyin"]
+
+[tool.coverage.report]
+show_missing = true
