@@ -75,6 +75,19 @@ def test_parser_enforces_unique_connections() -> None:
         parse_map(dup)
     dup.unlink()
 
+    # Reversed order is the SAME unordered connection (connection_key is canonical).
+    rev = Path("/tmp/dup_conn_reversed.txt")
+    rev.write_text(
+        "nb_drones: 2\n"
+        "start_hub: start 0 0 [color=green]\n"
+        "end_hub: goal 10 0 [color=red]\n"
+        "connection: start-goal\n"
+        "connection: goal-start\n"  # Duplicate, reversed
+    )
+    with pytest.raises(ValidationError, match="duplicate connection"):
+        parse_map(rev)
+    rev.unlink()
+
 
 def test_parser_requires_start_and_end() -> None:
     """F1.2 — missing start or end zone is a validation failure.
