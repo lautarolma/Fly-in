@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Sequence
 
@@ -19,12 +20,20 @@ class ParsedMap:
     The fleet is intentionally NOT stored here: `make_fleet(nb_drones, start)` builds a
     fresh list of drones on every run (D7). A `frozen` dataclass containing mutable
     `Drone` instances would only freeze the reference, not the drones themselves.
+
+    `zone_declarations`, `all_zones` and `all_connections` form an **unpruned snapshot**
+    of the input (D10). They keep every declared zone (including `blocked`) and every
+    `connection:` line (including those incident to blocked zones), so the independent
+    input validator can re-derive rules that the navigable `graph` cannot express.
     """
 
     graph: Graph
     nb_drones: int
     start: str
     end: str
+    zone_declarations: tuple[tuple[str, int, str], ...] = ()
+    all_zones: Mapping[str, Zone] = field(default_factory=dict)
+    all_connections: tuple[tuple[Connection, int], ...] = ()
 
 
 def read_lines(path: Path) -> list[str]:
@@ -225,8 +234,9 @@ def parse_lines(lines: Sequence[str]) -> ParsedMap:
     )
 
     declared: dict[str, int] = {}
+    zone_declarations: list[tuple[str, int, str]] = []
     zones_by_name: dict[str, Zone] = {}
-    connections: list[Connection] = []
+    connections: list[tuple[Connection, int]] = []
     seen_connections: dict[tuple[str, str], int] = {}
     start: str | None = None
     start_line: int | None = None
@@ -257,6 +267,7 @@ def parse_lines(lines: Sequence[str]) -> ParsedMap:
                     )
                 end, end_line = zone.name, line_no
             zones_by_name[zone.name] = zone
+            zone_declarations.append((zone.name, line_no, tag))
         elif tag == "connection":
             a, b, cap = _parse_connection_line(rest, line_no, declared)
             key = connection_key(a, b)
@@ -267,7 +278,7 @@ def parse_lines(lines: Sequence[str]) -> ParsedMap:
                     line_no,
                 )
             seen_connections[key] = line_no
-            connections.append(Connection(a=a, b=b, cap=cap))
+            connections.append((Connection(a=a, b=b, cap=cap), line_no))
         else:
             raise ParseError(f"unknown line type {tag!r}", line_no)
 
@@ -281,11 +292,19 @@ def parse_lines(lines: Sequence[str]) -> ParsedMap:
     for name, zone in zones_by_name.items():
         if zone.type is not ZoneType.BLOCKED:
             graph.add_zone(zone)
-    for connection in connections:
+    for connection, _line_no in connections:
         if connection.a in graph.zones and connection.b in graph.zones:
             graph.add_connection(connection)
 
-    return ParsedMap(graph=graph, nb_drones=nb_drones, start=start, end=end)
+    return ParsedMap(
+        graph=graph,
+        nb_drones=nb_drones,
+        start=start,
+        end=end,
+        zone_declarations=tuple(zone_declarations),
+        all_zones=dict(zones_by_name),
+        all_connections=tuple(connections),
+    )
 
 
 def parse_map(path: Path) -> ParsedMap:
