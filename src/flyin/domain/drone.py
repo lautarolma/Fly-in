@@ -22,3 +22,8 @@ class Drone:
     path: list[str] = field(default_factory=list)
     index: int = 0
     state: DroneState = DroneState.WAITING
+
+
+def make_fleet(nb_drones: int, start: str) -> list[Drone]:
+    """Create `nb_drones` idle drones D1..DN at `start`, fresh on every call."""
+    return [Drone(id=f"D{i}", path=[start]) for i in range(1, nb_drones + 1)]

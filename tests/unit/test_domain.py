@@ -8,6 +8,8 @@ import pytest
 
 from flyin.domain.connection import Connection, connection_key
 from flyin.domain.graph import Graph
+from flyin.domain.drone import make_fleet
+from flyin.domain.drone import DroneState
 from flyin.domain.zone import Zone, ZoneType
 
 
@@ -43,3 +45,31 @@ def test_graph_unknown_connection_raises() -> None:
     graph.add_zone(Zone(name="solo", x=0, y=0))
     with pytest.raises(KeyError):
         graph.connection("solo", "nowhere")
+
+
+def test_zone_enter_cost() -> None:
+    """Costo de entrar según el tipo de zona."""
+    assert ZoneType.NORMAL.enter_cost == 1
+    assert ZoneType.PRIORITY.enter_cost == 1
+    assert ZoneType.RESTRICTED.enter_cost == 2
+    assert ZoneType.BLOCKED.enter_cost is None
+
+
+def test_make_fleet_fresh_each_call() -> None:
+    """make_fleet devuelve una lista nueva en cada llamada."""
+    drones1 = make_fleet(2, "start")
+    drones2 = make_fleet(2, "start")
+    assert drones1[0].id == "D1"
+    assert drones1[0].path == ["start"]
+    assert drones1[0].state == DroneState.WAITING
+    drones2 = make_fleet(2, "start")
+    assert drones2[0].id == "D1"
+    assert drones2[0].path == ["start"]
+    # Las listas son objetos distintos
+    assert drones1 is not drones2
+
+
+def test_make_fleet_nb_drones_0() -> None:
+    """make_fleet(0, start) devuelve lista vacía."""
+    drones = make_fleet(0, "start")
+    assert drones == []

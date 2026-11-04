@@ -14,6 +14,15 @@ class ZoneType(Enum):
     RESTRICTED = "restricted"
     BLOCKED = "blocked"
 
+    @property
+    def enter_cost(self) -> int | None:
+        """Costo de entrar a una zona de este tipo. None significa impasable."""
+        if self is ZoneType.NORMAL or self is ZoneType.PRIORITY:
+            return 1
+        if self is ZoneType.RESTRICTED:
+            return 2
+        return None
+
 
 @dataclass(slots=True, frozen=True)
 class Zone:
