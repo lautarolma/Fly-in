@@ -10,6 +10,9 @@ import argparse
 import sys
 from pathlib import Path
 
+from flyin.parsing.errors import MapError
+from flyin.parsing.input_rules import load_map
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the argparse parser for the `fly-in` command."""
@@ -27,17 +30,25 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Run the CLI; return a process exit code (0 on success)."""
+    """Run the CLI; return a process exit code (0 on success, non-zero on any input error)."""
     parser = build_parser()
     args = parser.parse_args(argv)
 
     map_file: Path = args.map_file
-    if not map_file.is_file():
+    try:
+        load_map(map_file)
+    except FileNotFoundError:
         print(f"error: map file not found: {map_file}", file=sys.stderr)
         return 1
+    except MapError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
+    except OSError as exc:
+        print(f"error: cannot read {map_file}: {exc}", file=sys.stderr)
+        return 1
 
-    # TODO(F1+): parse → plan → simulate → validate → print official lines to stdout.
-    print(f"fly-in: skeleton ready, pipeline pending for {map_file}", file=sys.stderr)
+    # TODO(F2+): plan → simulate → validate → print official lines to stdout.
+    # Until then, a validated map is a successful run with no turns to emit.
     return 0
 
 
