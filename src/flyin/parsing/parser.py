@@ -13,18 +13,17 @@ from flyin.domain.zone import Zone, ZoneType
 from flyin.parsing.errors import ParseError, ValidationError
 
 
+# ---------------------------------------------------------------------------
+# Parsed map model
+# ---------------------------------------------------------------------------
+
 @dataclass(slots=True, frozen=True)
 class ParsedMap:
-    """Result of parsing a map: navigable graph plus declared fleet metadata.
+    """Parsed navigable graph and original declarations.
 
-    The fleet is intentionally NOT stored here: `make_fleet(nb_drones, start)` builds a
-    fresh list of drones on every run (D7). A `frozen` dataclass containing mutable
-    `Drone` instances would only freeze the reference, not the drones themselves.
-
-    `zone_declarations`, `all_zones` and `all_connections` form an **unpruned snapshot**
-    of the input (D10). They keep every declared zone (including `blocked`) and every
-    `connection:` line (including those incident to blocked zones), so the independent
-    input validator can re-derive rules that the navigable `graph` cannot express.
+    The fleet is created separately for each simulation run, so it is not
+    stored here. Declaration snapshots preserve blocked zones and raw
+    connections for independent input validation.
     """
 
     graph: Graph
@@ -35,6 +34,10 @@ class ParsedMap:
     all_zones: Mapping[str, Zone] = field(default_factory=dict)
     all_connections: tuple[tuple[Connection, int], ...] = ()
 
+
+# ---------------------------------------------------------------------------
+# Input
+# ---------------------------------------------------------------------------
 
 def read_lines(path: Path) -> list[str]:
     """Read the raw map lines using a context manager (REQ-ERR-1, closed handle)."""
@@ -50,6 +53,10 @@ def _significant_lines(lines: Sequence[str]) -> list[tuple[int, str]]:
         if raw.strip() and not raw.lstrip().startswith("#")
     ]
 
+
+# ---------------------------------------------------------------------------
+# Shared parsing helpers
+# ---------------------------------------------------------------------------
 
 def _split_metadata(rest: str, line_no: int) -> tuple[str, str]:
     """Split a line into head and metadata block `[ ... ]`.
@@ -131,6 +138,10 @@ def _parse_zone_type(value: str, line_no: int) -> ZoneType:
             f"tipo de zona inválido {value!r} (válidos: {valid})", line_no
         ) from None
 
+
+# ---------------------------------------------------------------------------
+# Declaration parsers
+# ---------------------------------------------------------------------------
 
 def _parse_zone_line(
     tag: str, rest: str, line_no: int, declared: dict[str, int]
@@ -216,6 +227,10 @@ def _parse_connection_line(
             cap = _parse_positive_int(value, line_no, "max_link_capacity")
     return a, b, cap
 
+
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
 
 def parse_lines(lines: Sequence[str]) -> ParsedMap:
     """Parse text lines into a `ParsedMap` (pure function: no I/O)."""
