@@ -9,7 +9,16 @@ from flyin.pathfinding.base import Path, PathFinder
 
 
 class DijkstraPathFinder(PathFinder):
-    """Exact shortest-path search using a `heapq` priority queue."""
+    """Exact shortest-path search using a `heapq` priority queue.
+
+    `best` stores the lowest known cost for each zone. The `heap` stores
+    pending zones ordered by their accumulated cost. Each extracted zone
+    may generate new candidate costs for its neighbors. A candidate that
+    does not improve the value already stored in `best` is ignored.
+
+    When `goal` is extracted from the heap, its cost is minimal among all
+    pending candidates, so the search can stop immediately.
+    """
 
     def find(self, graph: Graph, start: str, goal: str) -> Path:
         """Return the minimum-cost path from `start` to `goal` in `graph`."""
@@ -48,7 +57,12 @@ class DijkstraPathFinder(PathFinder):
         return Path(zones=tuple(zones), cost=best[goal])
 
     def distances_to(self, graph: Graph, goal: str) -> dict[str, int]:
-        """Reverse Dijkstra: cost from every zone to `goal` (F2.3)."""
+        """Reverse Dijkstra: cost from every zone to `goal` (F2.3).
+
+        Zone costs are charged by destination, so `a->b` and `b->a` may differ.
+        Relaxing the reversed edge `neighbor -> node` must therefore charge
+        `enter_cost(node)`, not `enter_cost(neighbor)`.
+        """
         if goal not in graph.zones:
             raise KeyError(f"unknown zone: goal={goal!r}")
         best: dict[str, int] = {goal: 0}
@@ -57,10 +71,10 @@ class DijkstraPathFinder(PathFinder):
             distance, node = heapq.heappop(heap)
             if distance > best[node]:
                 continue
+            weight = graph.zones[node].type.enter_cost
+            if weight is None:
+                continue
             for neighbor in graph.neighbors(node):
-                weight = graph.zones[neighbor].type.enter_cost
-                if weight is None:
-                    continue
                 candidate = distance + weight
                 if neighbor not in best or candidate < best[neighbor]:
                     best[neighbor] = candidate

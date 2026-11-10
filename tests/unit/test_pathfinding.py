@@ -96,6 +96,48 @@ def test_dijkstra_distances_to_single_zone() -> None:
     assert distances["goal"] == 1
 
 
+def _asymmetric_graph() -> Graph:
+    """Two start->goal routes: via `slow` (RESTRICTED) and via `a`->`b` (all NORMAL)."""
+    graph = Graph()
+    graph.add_zone(Zone(name="start", x=0, y=0))
+    graph.add_zone(Zone(name="slow", x=1, y=0, type=ZoneType.RESTRICTED))
+    graph.add_zone(Zone(name="a", x=0, y=1))
+    graph.add_zone(Zone(name="b", x=1, y=1))
+    graph.add_zone(Zone(name="goal", x=2, y=0))
+    graph.add_connection(Connection(a="start", b="slow"))
+    graph.add_connection(Connection(a="slow", b="goal"))
+    graph.add_connection(Connection(a="start", b="a"))
+    graph.add_connection(Connection(a="a", b="b"))
+    graph.add_connection(Connection(a="b", b="goal"))
+    return graph
+
+
+def test_dijkstra_distances_to_asymmetric_costs() -> None:
+    """Entering `slow` costs 2 but leaving it costs 1: charge by destination, not origin."""
+    distances = DijkstraPathFinder().distances_to(_asymmetric_graph(), "goal")
+    assert distances["slow"] == 1  # slow -> goal enters goal (NORMAL) = 1
+    assert distances["b"] == 1  # b -> goal enters goal (NORMAL) = 1
+    assert distances["a"] == 2  # a -> b -> goal = 1 + 1
+    assert distances["start"] == 3  # start -> slow -> goal = 2 + 1
+
+
+def test_dijkstra_distances_to_matches_forward_find() -> None:
+    """Property: the reverse table equals the forward cost for every zone."""
+    finder = DijkstraPathFinder()
+    graph = _asymmetric_graph()
+    distances = finder.distances_to(graph, "goal")
+    for zone in distances:
+        assert distances[zone] == finder.find(graph, zone, "goal").cost
+
+
+def test_astar_optimal_with_asymmetric_costs() -> None:
+    """With the corrected heuristic, A* must match Dijkstra on destination-charged costs."""
+    graph = _asymmetric_graph()
+    dijkstra = DijkstraPathFinder()
+    via_astar = AStarPathFinder(dijkstra).find(graph, "start", "goal")
+    assert via_astar == dijkstra.find(graph, "start", "goal")
+
+
 def test_astar_returns_same_path_as_dijkstra() -> None:
     graph = _linear_graph()
     via_dijkstra = DijkstraPathFinder().find(graph, "start", "goal")
