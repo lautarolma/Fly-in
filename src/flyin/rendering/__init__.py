@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from flyin.rendering.formatter import format_turn, transit_token
+from flyin.rendering.formatter import format_turn, move_token, transit_token
 from flyin.rendering.renderer import Renderer
 
-__all__ = ["Renderer", "format_turn", "transit_token"]
+__all__ = ["Renderer", "format_turn", "move_token", "transit_token"]

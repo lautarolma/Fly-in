@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from flyin.domain.drone import Drone, DroneState
 from flyin.domain.graph import Graph
 from flyin.pathfinding.dijkstra import DijkstraPathFinder
+from flyin.rendering.formatter import format_turn, move_token, transit_token
 from flyin.simulation.reservation_table import LinkKey, ReservationTable
 
 
@@ -65,7 +66,7 @@ class Simulation:
                 break  # I9: deadlock, no empty line and no infinite loop.
             if events:
                 ordered = sorted(events, key=lambda event: _id_key(event[0]))
-                lines.append(" ".join(token for _id, token in ordered))
+                lines.append(format_turn([token for _id, token in ordered]))
             self._close_turn(turn)
             turn += 1
         return lines
@@ -85,7 +86,7 @@ class Simulation:
                 if target is None:
                     raise RuntimeError(f"{drone.id}: IN_TRANSIT without target")
                 self._land(drone, target, turn, consume_pending=True)
-                landed.append((drone.id, f"{drone.id}-{target}"))
+                landed.append((drone.id, move_token(drone.id, target)))
         return landed
 
     def _proposals(self, distances: dict[str, int]) -> list[MovementProposal]:
@@ -185,9 +186,12 @@ class Simulation:
 
     @staticmethod
     def _departure_token(proposal: MovementProposal) -> str:
+        """Delegate the exact token syntax to the F4 formatter (A6)."""
         if proposal.enter_cost == 2:
-            return f"{proposal.drone_id}-{proposal.origin}-{proposal.destination}"
-        return f"{proposal.drone_id}-{proposal.destination}"
+            return transit_token(
+                proposal.drone_id, proposal.origin, proposal.destination
+            )
+        return move_token(proposal.drone_id, proposal.destination)
 
     def _close_turn(self, turn: int) -> None:
         """Prune link history and seed next turn's occupancy for grounded drones."""
