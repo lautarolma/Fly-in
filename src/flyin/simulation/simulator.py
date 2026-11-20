@@ -39,11 +39,13 @@ class Simulation:
         drones: list[Drone],
         end: str,
         table: ReservationTable | None = None,
+        transit_occupies_full_period: bool = True,
     ) -> None:
         self.graph = graph
         self.drones = drones
         self.end = end
         self.table = table if table is not None else ReservationTable()
+        self.transit_occupies_full_period = transit_occupies_full_period
         self._by_id = {drone.id: drone for drone in drones}
 
     def run(self) -> list[str]:
@@ -147,7 +149,13 @@ class Simulation:
 
         connection = self.graph.connection(proposal.origin, proposal.destination)
         restricted = proposal.enter_cost == 2
-        window = (turn, turn + 1) if restricted else (turn,)
+        # D2b: por default la ventana cubre todo el tránsito; el flag permite medir
+        # la variante "sólo despegue". La llegada forzada no depende de esta política.
+        window = (
+            (turn, turn + 1)
+            if restricted and self.transit_occupies_full_period
+            else (turn,)
+        )
         if not self.table.reserve_link_window(connection.key, window, connection.cap):
             return False
 
