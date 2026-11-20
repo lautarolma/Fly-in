@@ -16,6 +16,19 @@ def test_cli_valid_map_exit_0() -> None:
     assert main([str(EASY_01)]) == 0
 
 
+def test_cli_prints_official_lines(capsys: pytest.CaptureFixture[str]) -> None:
+    """F3.6 — stdout carries only the per-turn lines, with no turn prefix."""
+    assert main([str(EASY_01)]) == 0
+    captured = capsys.readouterr()
+    assert captured.out == (
+        "D1-waypoint1\n"
+        "D1-waypoint2 D2-waypoint1\n"
+        "D1-goal D2-waypoint2\n"
+        "D2-goal\n"
+    )
+    assert captured.err == ""
+
+
 def test_cli_bad_args_exit_nonzero() -> None:
     """REQ-CLI-1 — missing/unknown arguments exit non-zero."""
     with pytest.raises(SystemExit) as exc:

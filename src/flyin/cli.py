@@ -1,7 +1,8 @@
 """Command-line entry point (REQ-CLI-1).
 
-The CLI accepts the path to a map file, runs the simulate→validate pipeline and prints the official
-per-turn lines to stdout. All diagnostics and the optional colored panel go to stderr.
+The CLI accepts a map file, builds the F3.6 single-route plan and simulates it, printing the
+official per-turn lines to stdout. The independent F7 validator and the optional colored panel
+are not wired yet; diagnostics already go to stderr.
 """
 
 from __future__ import annotations
@@ -10,8 +11,20 @@ import argparse
 import sys
 from pathlib import Path
 
+from flyin.domain.drone import make_fleet
 from flyin.parsing.errors import MapError
 from flyin.parsing.input_rules import load_map
+from flyin.parsing.parser import ParsedMap
+from flyin.pathfinding.dijkstra import DijkstraPathFinder
+from flyin.routing.allocator import assign_single_route
+from flyin.simulation.simulator import Simulation
+
+
+def _run_propuesta_a(parsed: ParsedMap) -> list[str]:
+    """F3.6: one shortest path for the whole fleet, then simulate it."""
+    path = DijkstraPathFinder().find(parsed.graph, parsed.start, parsed.end)
+    drones = assign_single_route(make_fleet(parsed.nb_drones, parsed.start), path)
+    return Simulation(parsed.graph, drones, parsed.end).run()
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,7 +49,7 @@ def main(argv: list[str] | None = None) -> int:
 
     map_file: Path = args.map_file
     try:
-        load_map(map_file)
+        parsed = load_map(map_file)
     except FileNotFoundError:
         print(f"error: map file not found: {map_file}", file=sys.stderr)
         return 1
@@ -47,8 +60,9 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: cannot read {map_file}: {exc}", file=sys.stderr)
         return 1
 
-    # TODO(F2+): plan → simulate → validate → print official lines to stdout.
-    # Until then, a validated map is a successful run with no turns to emit.
+    lines = _run_propuesta_a(parsed)
+    if lines:
+        print("\n".join(lines))
     return 0
 
 
