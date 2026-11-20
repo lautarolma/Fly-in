@@ -70,10 +70,17 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: cannot read {map_file}: {exc}", file=sys.stderr)
         return 1
 
-    fleet = _build_fleet(parsed)
-    renderer = Renderer(parsed.graph, fleet, stream=sys.stderr) if args.visual else None
-    on_turn = renderer.render if renderer is not None else None
-    lines = _run_propuesta_a(parsed, fleet, on_turn)
+    try:
+        fleet = _build_fleet(parsed)
+        renderer = (
+            Renderer(parsed.graph, fleet, stream=sys.stderr) if args.visual else None
+        )
+        on_turn = renderer.render if renderer is not None else None
+        lines = _run_propuesta_a(parsed, fleet, on_turn)
+    except (ValueError, RuntimeError, KeyError) as exc:
+        print(f"error: cannot simulate map: {exc}", file=sys.stderr)
+        return 1
+
     if lines:
         print("\n".join(lines))
     return 0

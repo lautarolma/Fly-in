@@ -56,6 +56,26 @@ def test_cli_missing_file_exit_nonzero(capsys: pytest.CaptureFixture[str]) -> No
     assert "error: map file not found" in capsys.readouterr().err
 
 
+@pytest.mark.parametrize(
+    "error", [ValueError("goal unreachable"), RuntimeError("bad simulation state")]
+)
+def test_cli_pipeline_error_exit_nonzero(
+    error: Exception,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """REQ-ERR-1: un fallo del pipeline va a stderr y devuelve exit 1."""
+
+    def boom(parsed: object) -> list[object]:
+        raise error
+
+    monkeypatch.setattr("flyin.cli._build_fleet", boom)
+    assert main([str(EASY_01)]) == 1
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert f"error: cannot simulate map: {error}" in captured.err
+
+
 def test_cli_invalid_map_exit_nonzero(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
