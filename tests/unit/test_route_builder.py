@@ -8,7 +8,7 @@ from flyin.domain.connection import Connection
 from flyin.domain.graph import Graph
 from flyin.domain.zone import Zone, ZoneType
 from flyin.pathfinding.base import Path
-from flyin.routing.route_builder import RouteBuilder
+from flyin.routing.route_builder import MAX_ROUTES, RouteBuilder, cap_route_count
 
 
 def _linear_graph() -> Graph:
@@ -35,6 +35,19 @@ def _two_corridors() -> Graph:
     graph.add_connection(Connection(a="start", b="a"))
     graph.add_connection(Connection(a="a", b="b"))
     graph.add_connection(Connection(a="b", b="goal"))
+    return graph
+
+
+def _fan_graph(corridors: int) -> Graph:
+    """`start` to `goal` through `corridors` independent middle zones."""
+    graph = Graph()
+    graph.add_zone(Zone(name="start", x=0, y=0))
+    graph.add_zone(Zone(name="goal", x=10, y=0))
+    for index in range(corridors):
+        middle = f"mid{index}"
+        graph.add_zone(Zone(name=middle, x=index, y=1))
+        graph.add_connection(Connection(a="start", b=middle))
+        graph.add_connection(Connection(a=middle, b="goal"))
     return graph
 
 
@@ -110,3 +123,32 @@ def test_build_does_not_mutate_graph_or_previous_routes() -> None:
 def test_build_rejects_nonpositive_penalty() -> None:
     with pytest.raises(ValueError):
         RouteBuilder(penalty=0)
+
+
+@pytest.mark.parametrize(
+    ("k", "nb_drones", "expected"),
+    [(8, 10, 4), (8, 2, 2), (3, 10, 3), (0, 10, 0), (-1, 10, 0), (3, 0, 0)],
+)
+def test_cap_route_count(k: int, nb_drones: int, expected: int) -> None:
+    assert cap_route_count(k, nb_drones) == expected
+    assert expected <= MAX_ROUTES
+
+
+def test_build_never_exceeds_max_routes() -> None:
+    routes = RouteBuilder().build(_fan_graph(6), "start", "goal", 100)
+    assert len(routes) == MAX_ROUTES
+    assert len({route.zones for route in routes}) == MAX_ROUTES
+
+
+def test_build_for_fleet_caps_by_drone_count() -> None:
+    routes = RouteBuilder().build_for_fleet(
+        _fan_graph(6), "start", "goal", 8, 2
+    )
+    assert len(routes) == 2
+
+
+def test_build_for_fleet_caps_by_max_routes() -> None:
+    routes = RouteBuilder().build_for_fleet(
+        _fan_graph(6), "start", "goal", 100, 25
+    )
+    assert len(routes) == MAX_ROUTES

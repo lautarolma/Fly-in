@@ -6,6 +6,13 @@ from flyin.domain.graph import Graph
 from flyin.pathfinding.base import Path
 from flyin.pathfinding.dijkstra import DijkstraPathFinder
 
+MAX_ROUTES = 4
+
+
+def cap_route_count(k: int, nb_drones: int) -> int:
+    """Return the effective route count: `min(k, MAX_ROUTES, nb_drones)`."""
+    return max(0, min(k, MAX_ROUTES, nb_drones))
+
 
 class RouteBuilder:
     """Produces up to `k` distinct candidate routes between two zones."""
@@ -24,6 +31,7 @@ class RouteBuilder:
         corridor. Start and goal belong to every route; penalizing them would
         not discriminate between candidates.
         """
+        k = min(k, MAX_ROUTES)
         if k <= 0:
             return []
         if start == goal:
@@ -51,6 +59,12 @@ class RouteBuilder:
             )
             self._penalize(penalties, found.zones)
         return routes
+
+    def build_for_fleet(
+        self, graph: Graph, start: str, goal: str, k: int, nb_drones: int
+    ) -> list[Path]:
+        """Build routes for a fleet, capping `k` by both 4 and the fleet size."""
+        return self.build(graph, start, goal, cap_route_count(k, nb_drones))
 
     def _penalize(self, penalties: dict[str, int], zones: tuple[str, ...]) -> None:
         """Add +delta to the internal zones of `zones`."""
