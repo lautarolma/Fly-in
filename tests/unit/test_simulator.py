@@ -2,13 +2,19 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
+
 from flyin.domain.connection import Connection
 from flyin.domain.drone import Drone, DroneState
 from flyin.domain.graph import Graph
 from flyin.domain.zone import Zone, ZoneType
+from flyin.parsing.input_rules import load_map
 from flyin.pathfinding.dijkstra import DijkstraPathFinder
 from flyin.simulation.reservation_table import ReservationTable
 from flyin.simulation.simulator import Simulation
+from tests.trace import assert_trace_respects_caps
 
 
 def _graph(*zones: Zone, links: tuple[tuple[str, str, int], ...] = ()) -> Graph:
@@ -217,3 +223,63 @@ def test_end_hub_restricted_two_turns() -> None:
     assert simulation.run() == ["D1-start-end", "D1-end"]
     assert drone.is_delivered
     assert simulation.table.can_reserve_zone("end", 2, None)
+
+
+# --- F3.5: capacity invariants re-derived from the emitted trace -----------
+
+
+def test_link_cap_one_admits_only_one_drone_per_turn() -> None:
+    """REQ-CAP-1: dos drones compitiendo por un link de cap 1 seTurnan."""
+    graph = _graph(
+        Zone("start", 0, 0, cap=None),
+        Zone("mid", 1, 0, cap=2),
+        Zone("end", 2, 0, cap=None),
+        links=(("start", "mid", 1), ("mid", "end", 1)),
+    )
+    drones = [
+        Drone(id="D1", route=("start", "mid", "end")),
+        Drone(id="D2", route=("start", "mid", "end")),
+    ]
+    lines = Simulation(graph, drones, "end").run()
+    assert lines == ["D1-mid", "D1-end D2-mid", "D2-end"]
+    assert all(
+        zone in ("start", "end")
+        for zone in assert_trace_respects_caps(
+            graph, lines, start="start", drone_ids=["D1", "D2"]
+        ).values()
+    )
+
+
+def test_end_hub_uncapped_admits_simultaneous_arrivals() -> None:
+    """REQ-CAP-1: `end_hub` sin cap recibe a toda la flota en el mismo turno."""
+    graph = _graph(
+        Zone("start", 0, 0, cap=None),
+        Zone("end", 1, 0, cap=None),
+        links=(("start", "end", 4),),
+    )
+    drone_ids = [f"D{n}" for n in range(1, 5)]
+    drones = [Drone(id=drone_id, route=("start", "end")) for drone_id in drone_ids]
+    lines = Simulation(graph, drones, "end").run()
+    assert lines == ["D1-end D2-end D3-end D4-end"]
+    final = assert_trace_respects_caps(
+        graph, lines, start="start", drone_ids=drone_ids
+    )
+    assert set(final.values()) == {"end"}
+
+
+@pytest.mark.parametrize(
+    "map_name",
+    ["01_linear_path.txt", "02_simple_fork.txt", "03_basic_capacity.txt"],
+)
+def test_trace_respects_caps_on_easy_maps(map_name: str, maps_dir: Path) -> None:
+    """I2/I3: la traza emitida no excede ninguna capacity de zona ni de link."""
+    parsed = load_map(maps_dir / "easy" / map_name)
+    path = DijkstraPathFinder().find(parsed.graph, parsed.start, parsed.end)
+    drone_ids = [f"D{n}" for n in range(1, parsed.nb_drones + 1)]
+    drones = [Drone(id=drone_id, route=path.zones) for drone_id in drone_ids]
+    lines = Simulation(parsed.graph, drones, parsed.end).run()
+    assert lines
+    final = assert_trace_respects_caps(
+        parsed.graph, lines, start=parsed.start, drone_ids=drone_ids
+    )
+    assert set(final.values()) == {parsed.end}
