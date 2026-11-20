@@ -1,4 +1,4 @@
-"""Domain invariants: immutability, canonical keys, capacities (F1.1)."""
+"""Domain invariants: immutability, canonical keys, capacities (F1.1/F3.1)."""
 
 from __future__ import annotations
 
@@ -8,8 +8,7 @@ import pytest
 
 from flyin.domain.connection import Connection, connection_key
 from flyin.domain.graph import Graph
-from flyin.domain.drone import make_fleet
-from flyin.domain.drone import DroneState
+from flyin.domain.drone import Drone, DroneState, make_fleet
 from flyin.domain.zone import Zone, ZoneType
 
 
@@ -60,12 +59,15 @@ def test_make_fleet_fresh_each_call() -> None:
     drones1 = make_fleet(2, "start")
     drones2 = make_fleet(2, "start")
     assert drones1[0].id == "D1"
-    assert drones1[0].path == ["start"]
-    assert drones1[0].state == DroneState.WAITING
-    drones2 = make_fleet(2, "start")
+    assert drones1[1].id == "D2"
+    assert drones1[0].route == ("start",)
+    assert drones1[0].waypoint_index == 0
+    assert drones1[0].state is DroneState.WAITING
+    assert drones1[0].target is None
+    assert drones1[0].transit_turns_left == 0
     assert drones2[0].id == "D1"
-    assert drones2[0].path == ["start"]
-    # Las listas son objetos distintos
+    assert drones2[0].route == ("start",)
+    # Las flotas son objetos distintos
     assert drones1 is not drones2
 
 
@@ -73,3 +75,50 @@ def test_make_fleet_nb_drones_0() -> None:
     """make_fleet(0, start) devuelve lista vacía."""
     drones = make_fleet(0, "start")
     assert drones == []
+
+
+def test_drone_route_is_an_immutable_tuple() -> None:
+    """La ruta es una tupla: nadie la muta desde afuera (F3.1)."""
+    drone = Drone(id="D1", route=("start", "end"))
+    assert isinstance(drone.route, tuple)
+    assert drone.route == ("start", "end")
+
+
+def test_drone_cursor_reads_current_and_next_zone() -> None:
+    """El cursor O(1) lee la zona actual y el siguiente waypoint."""
+    drone = Drone(id="D1", route=("start", "hub", "end"), waypoint_index=1)
+    assert drone.current_zone == "hub"
+    assert drone.next_zone == "end"
+    assert not drone.route_exhausted
+
+
+def test_drone_route_exhausted_is_not_the_same_as_delivered() -> None:
+    """Agotar la ruta no implica estar entregado: manda el estado FSM."""
+    drone = Drone(id="D1", route=("start", "end"), waypoint_index=1)
+    assert drone.next_zone is None
+    assert drone.route_exhausted
+    assert not drone.is_delivered
+    drone.state = DroneState.DELIVERED
+    assert drone.is_delivered
+
+
+def test_drone_transit_fields_are_inactive_by_default() -> None:
+    """I1: WAITING implica target=None y transit_turns_left=0."""
+    drone = Drone(id="D1", route=("start",))
+    assert drone.state is DroneState.WAITING
+    assert drone.target is None
+    assert drone.transit_turns_left == 0
+
+
+def test_drone_in_transit_keeps_turns_left() -> None:
+    """I1: IN_TRANSIT implica transit_turns_left > 0."""
+    drone = Drone(
+        id="D1",
+        route=("hub", "roof1"),
+        state=DroneState.IN_TRANSIT,
+        target="roof1",
+        transit_turns_left=1,
+    )
+    assert drone.state is DroneState.IN_TRANSIT
+    assert drone.target == "roof1"
+    assert drone.transit_turns_left > 0
