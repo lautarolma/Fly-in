@@ -29,6 +29,17 @@ def test_cli_prints_official_lines(capsys: pytest.CaptureFixture[str]) -> None:
     assert captured.err == ""
 
 
+def test_cli_visual_keeps_stdout_pure(capsys: pytest.CaptureFixture[str]) -> None:
+    """REQ-VIS-1: --visual pinta stderr; stdout sigue siendo sólo líneas oficiales."""
+    assert main([str(EASY_01), "--visual"]) == 0
+    captured = capsys.readouterr()
+    assert "\033[" not in captured.out
+    assert captured.out.startswith("D1-waypoint1\n")
+    assert captured.out.endswith("D2-goal\n")
+    assert "\033[" in captured.err
+    assert "turn 1" in captured.err
+
+
 def test_cli_bad_args_exit_nonzero() -> None:
     """REQ-CLI-1 — missing/unknown arguments exit non-zero."""
     with pytest.raises(SystemExit) as exc:

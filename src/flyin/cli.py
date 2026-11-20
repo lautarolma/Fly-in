@@ -1,30 +1,40 @@
 """Command-line entry point (REQ-CLI-1).
 
 The CLI accepts a map file, builds the F3.6 single-route plan and simulates it, printing the
-official per-turn lines to stdout. The independent F7 validator and the optional colored panel
-are not wired yet; diagnostics already go to stderr.
+official per-turn lines to stdout. `--visual` adds a colored panel on stderr without touching
+stdout. The independent F7 validator is not wired yet.
 """
 
 from __future__ import annotations
 
 import argparse
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
-from flyin.domain.drone import make_fleet
+from flyin.domain.drone import Drone, make_fleet
 from flyin.parsing.errors import MapError
 from flyin.parsing.input_rules import load_map
 from flyin.parsing.parser import ParsedMap
 from flyin.pathfinding.dijkstra import DijkstraPathFinder
+from flyin.rendering.renderer import Renderer
 from flyin.routing.allocator import assign_single_route
 from flyin.simulation.simulator import Simulation
 
 
-def _run_propuesta_a(parsed: ParsedMap) -> list[str]:
-    """F3.6: one shortest path for the whole fleet, then simulate it."""
+def _build_fleet(parsed: ParsedMap) -> list[Drone]:
+    """F3.6: build the fleet with one shared shortest route."""
     path = DijkstraPathFinder().find(parsed.graph, parsed.start, parsed.end)
-    drones = assign_single_route(make_fleet(parsed.nb_drones, parsed.start), path)
-    return Simulation(parsed.graph, drones, parsed.end).run()
+    return assign_single_route(make_fleet(parsed.nb_drones, parsed.start), path)
+
+
+def _run_propuesta_a(
+    parsed: ParsedMap,
+    fleet: list[Drone],
+    on_turn: Callable[[int, str], None] | None = None,
+) -> list[str]:
+    """Simulate the assigned fleet, optionally notifying the visual renderer."""
+    return Simulation(parsed.graph, fleet, parsed.end).run(on_turn=on_turn)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -60,7 +70,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: cannot read {map_file}: {exc}", file=sys.stderr)
         return 1
 
-    lines = _run_propuesta_a(parsed)
+    fleet = _build_fleet(parsed)
+    renderer = Renderer(parsed.graph, fleet, stream=sys.stderr) if args.visual else None
+    on_turn = renderer.render if renderer is not None else None
+    lines = _run_propuesta_a(parsed, fleet, on_turn)
     if lines:
         print("\n".join(lines))
     return 0

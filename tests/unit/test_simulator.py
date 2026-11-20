@@ -283,3 +283,18 @@ def test_trace_respects_caps_on_easy_maps(map_name: str, maps_dir: Path) -> None
         parsed.graph, lines, start=parsed.start, drone_ids=drone_ids
     )
     assert set(final.values()) == {parsed.end}
+
+
+def test_run_notifies_observer_per_emitted_turn() -> None:
+    """F4.3: el observer visual recibe el turno y la línea ya formateada."""
+    graph = _graph(
+        Zone("start", 0, 0, cap=None),
+        Zone("end", 1, 0, cap=None),
+        links=(("start", "end", 1),),
+    )
+    seen: list[tuple[int, str]] = []
+    lines = Simulation(graph, [Drone(id="D1", route=("start", "end"))], "end").run(
+        on_turn=lambda turn, line: seen.append((turn, line))
+    )
+    assert lines == ["D1-end"]
+    assert seen == [(1, "D1-end")]

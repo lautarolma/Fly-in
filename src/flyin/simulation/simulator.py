@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from flyin.domain.drone import Drone, DroneState
@@ -49,8 +50,12 @@ class Simulation:
         self.transit_occupies_full_period = transit_occupies_full_period
         self._by_id = {drone.id: drone for drone in drones}
 
-    def run(self) -> list[str]:
-        """Simulate until all drones are delivered; return the per-turn lines."""
+    def run(self, on_turn: Callable[[int, str], None] | None = None) -> list[str]:
+        """Simulate until all drones are delivered; return the per-turn lines.
+
+        `on_turn` is an optional observer for the visual layer. The simulator never imports the
+        renderer: the CLI injects the callback, so stdout stays byte-for-byte clean.
+        """
         distances = DijkstraPathFinder().distances_to(self.graph, self.end)
         for drone in self.drones:
             self.table.reserve_zone(drone.current_zone, 1)
@@ -66,7 +71,10 @@ class Simulation:
                 break  # I9: deadlock, no empty line and no infinite loop.
             if events:
                 ordered = sorted(events, key=lambda event: _id_key(event[0]))
-                lines.append(format_turn([token for _id, token in ordered]))
+                line = format_turn([token for _id, token in ordered])
+                lines.append(line)
+                if on_turn is not None:
+                    on_turn(turn, line)
             self._close_turn(turn)
             turn += 1
         return lines
