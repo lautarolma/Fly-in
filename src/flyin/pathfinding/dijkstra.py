@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import heapq
+from collections.abc import Mapping
 
 from flyin.domain.graph import Graph
 from flyin.pathfinding.base import Path, PathFinder
@@ -18,7 +19,23 @@ class DijkstraPathFinder(PathFinder):
 
     When `goal` is extracted from the heap, its cost is minimal among all
     pending candidates, so the search can stop immediately.
+
+    An optional mapping of extra zone costs lets callers steer subsequent
+    searches (F5.1) without changing the domain objects or the base weights.
     """
+
+    def __init__(self, penalties: Mapping[str, int] | None = None) -> None:
+        """Store a read-only view of the optional per-zone penalties."""
+        self._penalties: Mapping[str, int] = (
+            penalties if penalties is not None else {}
+        )
+
+    def _weight(self, graph: Graph, zone: str) -> int | None:
+        """Return the base enter cost of `zone` plus its accumulated penalty."""
+        base = graph.zones[zone].type.enter_cost
+        if base is None:
+            return None
+        return base + self._penalties.get(zone, 0)
 
     def find(self, graph: Graph, start: str, goal: str) -> Path:
         """Return the minimum-cost path from `start` to `goal` in `graph`."""
@@ -37,7 +54,7 @@ class DijkstraPathFinder(PathFinder):
             if node == goal:
                 break
             for neighbor in graph.neighbors(node):
-                weight = graph.zones[neighbor].type.enter_cost
+                weight = self._weight(graph, neighbor)
                 if weight is None:
                     continue
                 candidate = distance + weight
@@ -71,7 +88,7 @@ class DijkstraPathFinder(PathFinder):
             distance, node = heapq.heappop(heap)
             if distance > best[node]:
                 continue
-            weight = graph.zones[node].type.enter_cost
+            weight = self._weight(graph, node)
             if weight is None:
                 continue
             for neighbor in graph.neighbors(node):
