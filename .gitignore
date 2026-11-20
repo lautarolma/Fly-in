@@ -59,3 +59,6 @@ Thumbs.db
 # Project specific
 apuntes.py
 *.log
+
+# Notas locales de trabajo (no versionadas)
+notes/
