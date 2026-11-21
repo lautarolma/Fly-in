@@ -7,6 +7,7 @@ from flyin.routing.estimator import (
     UNBOUNDED,
     MakespanEstimator,
     bottleneck_capacity,
+    route_bound,
 )
 from flyin.routing.route_builder import MAX_ROUTES, RouteBuilder, cap_route_count
 
@@ -18,4 +19,5 @@ __all__ = [
     "RouteBuilder",
     "bottleneck_capacity",
     "cap_route_count",
+    "route_bound",
 ]

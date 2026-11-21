@@ -30,6 +30,26 @@ def bottleneck_capacity(graph: Graph, route: Path) -> int:
     return min(caps) if caps else UNBOUNDED
 
 
+def route_bound(cost: int, load: int, cap: int) -> int:
+    """Return the F5.3 cota of a single route: `cost + ceil(load / cap) - 1`.
+
+    This is the only place the formula lives: `estimate` maximises it across
+    routes and the F5.5 allocator evaluates it one drone ahead (`load + 1`) to
+    rank candidate routes. An empty route contributes nothing, so `load == 0`
+    returns 0 instead of the meaningless `cost - 1` and callers can take the
+    max over every route without filtering.
+    """
+    if cost < 0:
+        raise ValueError("route cost must be >= 0")
+    if load < 0:
+        raise ValueError("load must be >= 0")
+    if cap < 1:
+        raise ValueError("capacity must be >= 1")
+    if load == 0:
+        return 0
+    return cost + (load + cap - 1) // cap - 1
+
+
 class MakespanEstimator:
     """Admissible lower bounds over a candidate set of routes."""
 
@@ -39,7 +59,7 @@ class MakespanEstimator:
         loads: list[int],
         capacities: list[int],
     ) -> int:
-        """Return `max(cost_i + ceil(load_i / cap_i) - 1)`.
+        """Return `max(route_bound(cost_i, load_i, cap_i))`.
 
         With `cap_i = 1` this is the lem-in bound. Larger capacities let
         drones enter in parallel, so the injection term shrinks. Routes with
@@ -48,18 +68,13 @@ class MakespanEstimator:
         if not len(route_costs) == len(loads) == len(capacities):
             raise ValueError("route_costs, loads and capacities must align")
 
-        bounds: list[int] = []
-        for cost, load, cap in zip(route_costs, loads, capacities):
-            if cost < 0:
-                raise ValueError("route cost must be >= 0")
-            if load < 0:
-                raise ValueError("load must be >= 0")
-            if cap < 1:
-                raise ValueError("capacity must be >= 1")
-            if load == 0:
-                continue
-            bounds.append(cost + (load + cap - 1) // cap - 1)
-        return max(bounds) if bounds else 0
+        return max(
+            (
+                route_bound(cost, load, cap)
+                for cost, load, cap in zip(route_costs, loads, capacities)
+            ),
+            default=0,
+        )
 
     def select_routes(
         self, graph: Graph, routes: list[Path], nb_drones: int

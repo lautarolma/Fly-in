@@ -18,6 +18,7 @@ from flyin.routing.estimator import (
     UNBOUNDED,
     MakespanEstimator,
     bottleneck_capacity,
+    route_bound,
 )
 from flyin.simulation.simulator import Simulation
 
@@ -67,6 +68,31 @@ def test_estimate_rejects_invalid_inputs(
 ) -> None:
     with pytest.raises(ValueError):
         MakespanEstimator().estimate(costs, loads, caps)
+
+
+# --- route_bound: la fórmula de la cota, dueña única --------------------
+
+
+def test_route_bound_is_the_lem_in_bound_at_capacity_one() -> None:
+    assert route_bound(3, 4, 1) == 6
+
+
+def test_route_bound_shrinks_the_injection_term_with_capacity() -> None:
+    assert route_bound(3, 4, 2) == 4
+
+
+def test_route_bound_is_zero_for_an_unused_route() -> None:
+    """Una ruta sin drones no aporta al máximo (no el `cost - 1` sin sentido)."""
+    assert route_bound(3, 0, 1) == 0
+
+
+@pytest.mark.parametrize(
+    ("cost", "load", "cap"),
+    [(-1, 4, 1), (3, -1, 1), (3, 4, 0)],
+)
+def test_route_bound_rejects_invalid_inputs(cost: int, load: int, cap: int) -> None:
+    with pytest.raises(ValueError):
+        route_bound(cost, load, cap)
 
 
 def test_bottleneck_is_the_tightest_zone_or_link() -> None:
