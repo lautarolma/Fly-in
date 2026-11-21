@@ -22,11 +22,9 @@ GOLDEN_EASY = {
     ),
     "02_simple_fork.txt": (
         "D1-junction D2-junction\n"
-        "D1-path_a D3-junction\n"
-        "D1-goal D2-path_a D4-junction\n"
-        "D2-goal D3-path_a\n"
-        "D3-goal D4-path_a\n"
-        "D4-goal\n"
+        "D1-path_a D2-path_b D3-junction D4-junction\n"
+        "D1-goal D2-goal D3-path_a D4-path_b\n"
+        "D3-goal D4-goal\n"
     ),
     "03_basic_capacity.txt": (
         "D1-bottleneck D2-bottleneck\n"

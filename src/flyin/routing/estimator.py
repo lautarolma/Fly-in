@@ -76,6 +76,24 @@ class MakespanEstimator:
             default=0,
         )
 
+    def fleet_bound(self, graph: Graph, routes: list[Path], nb_drones: int) -> int:
+        """Return the makespan lower bound for the whole fleet over `routes`.
+
+        Chooses the admissible subset with the lowest bound (`select_routes`) and
+        returns that bound. This is the fleet-level expression of the structural
+        bound `makespan >= c + ceil(N / cap) - 1`, i.e. the number the allocator
+        acts on and the number compared against the measured makespan.
+
+        Returns 0 when there is nothing to assign (no drones or no candidates).
+        """
+        chosen = self.select_routes(graph, routes, nb_drones)
+        if not chosen:
+            return 0
+        costs = [route.cost for route in chosen]
+        loads = self._balanced_loads(nb_drones, len(chosen))
+        caps = [bottleneck_capacity(graph, route) for route in chosen]
+        return self.estimate(costs, loads, caps)
+
     def select_routes(
         self, graph: Graph, routes: list[Path], nb_drones: int
     ) -> list[Path]:

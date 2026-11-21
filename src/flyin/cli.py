@@ -1,8 +1,9 @@
 """Command-line entry point (REQ-CLI-1).
 
-The CLI accepts a map file, builds the F3.6 single-route plan and simulates it, printing the
-official per-turn lines to stdout. `--visual` adds a colored panel on stderr without touching
-stdout. The independent F7 validator is not wired yet.
+The CLI accepts a map file, builds the F5 route plan (k candidate routes -> best subset ->
+greedy ETA assignment, Propuesta A) and simulates it, printing the official per-turn lines to
+stdout. `--visual` adds a colored panel on stderr without touching stdout. The independent F7
+validator is not wired yet.
 """
 
 from __future__ import annotations
@@ -16,16 +17,26 @@ from flyin.domain.drone import Drone, make_fleet
 from flyin.parsing.errors import MapError
 from flyin.parsing.input_rules import load_map
 from flyin.parsing.parser import ParsedMap
-from flyin.pathfinding.dijkstra import DijkstraPathFinder
 from flyin.rendering.renderer import Renderer
-from flyin.routing.allocator import assign_single_route
+from flyin.routing.allocator import Allocator, assign_routes
+from flyin.routing.estimator import MakespanEstimator
+from flyin.routing.route_builder import RouteBuilder
 from flyin.simulation.simulator import Simulation
 
 
 def _build_fleet(parsed: ParsedMap) -> list[Drone]:
-    """F3.6: build the fleet with one shared shortest route."""
-    path = DijkstraPathFinder().find(parsed.graph, parsed.start, parsed.end)
-    return assign_single_route(make_fleet(parsed.nb_drones, parsed.start), path)
+    """F5.1-F5.5: build the fleet from the best route subset (Propuesta A).
+
+    Pipeline: RouteBuilder -> MakespanEstimator -> Allocator -> assign per-drone routes.
+    """
+    routes = RouteBuilder().build_for_fleet(
+        parsed.graph, parsed.start, parsed.end, k=4, nb_drones=parsed.nb_drones
+    )
+    chosen = MakespanEstimator().select_routes(
+        parsed.graph, routes, parsed.nb_drones
+    )
+    assignment = Allocator().assign(parsed.graph, chosen, parsed.nb_drones)
+    return assign_routes(make_fleet(parsed.nb_drones, parsed.start), assignment)
 
 
 def _run_propuesta_a(
