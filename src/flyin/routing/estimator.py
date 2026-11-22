@@ -1,13 +1,16 @@
-"""JUEZ 1: estimates the makespan of a route assignment without simulating (F5.3)."""
+"""JUEZ 1: estimates the makespan of a route assignment without simulating (F5.3).
+
+This module owns the *judgement*: the bound formula (`route_bound`), the
+bottleneck capacity of a route and the fleet expression of the bound. Choosing
+which route subset to use is *policy* and lives in `routing/scheduler.py`.
+"""
 
 from __future__ import annotations
 
 import sys
-from itertools import combinations
 
 from flyin.domain.graph import Graph
 from flyin.pathfinding.base import Path
-from flyin.routing.route_builder import MAX_ROUTES
 
 UNBOUNDED = sys.maxsize
 
@@ -75,61 +78,3 @@ class MakespanEstimator:
             ),
             default=0,
         )
-
-    def fleet_bound(self, graph: Graph, routes: list[Path], nb_drones: int) -> int:
-        """Return the makespan lower bound for the whole fleet over `routes`.
-
-        Chooses the admissible subset with the lowest bound (`select_routes`) and
-        returns that bound. This is the fleet-level expression of the structural
-        bound `makespan >= c + ceil(N / cap) - 1`, i.e. the number the allocator
-        acts on and the number compared against the measured makespan.
-
-        Returns 0 when there is nothing to assign (no drones or no candidates).
-        """
-        chosen = self.select_routes(graph, routes, nb_drones)
-        if not chosen:
-            return 0
-        costs = [route.cost for route in chosen]
-        loads = self._balanced_loads(nb_drones, len(chosen))
-        caps = [bottleneck_capacity(graph, route) for route in chosen]
-        return self.estimate(costs, loads, caps)
-
-    def select_routes(
-        self, graph: Graph, routes: list[Path], nb_drones: int
-    ) -> list[Path]:
-        """Return the subset with the lowest estimated makespan (F5.4).
-
-        All non-empty subsets of the bounded candidate set are enumerated.
-        Within a subset the fleet is split as evenly as possible, with the
-        remainder going to the cheapest routes first. Ties prefer fewer routes
-        and then the earlier candidates, so the result is deterministic.
-        """
-        if nb_drones < 0:
-            raise ValueError("nb_drones must be >= 0")
-        if len(routes) > MAX_ROUTES:
-            raise ValueError(f"at most {MAX_ROUTES} candidate routes are allowed")
-        if nb_drones == 0 or not routes:
-            return []
-
-        capacities = [bottleneck_capacity(graph, route) for route in routes]
-        best: tuple[int, int, tuple[int, ...]] | None = None
-        chosen: tuple[int, ...] = ()
-        for size in range(1, len(routes) + 1):
-            for indices in combinations(range(len(routes)), size):
-                loads = self._balanced_loads(nb_drones, size)
-                bound = self.estimate(
-                    [routes[index].cost for index in indices],
-                    loads,
-                    [capacities[index] for index in indices],
-                )
-                candidate = (bound, size, indices)
-                if best is None or candidate < best:
-                    best = candidate
-                    chosen = indices
-        return [routes[index] for index in chosen]
-
-    @staticmethod
-    def _balanced_loads(nb_drones: int, route_count: int) -> list[int]:
-        """Split the fleet, giving the remainder to the first routes."""
-        base, extra = divmod(nb_drones, route_count)
-        return [base + (1 if index < extra else 0) for index in range(route_count)]

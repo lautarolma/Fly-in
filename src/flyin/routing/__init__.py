@@ -1,4 +1,4 @@
-"""Routing layer: build candidate routes, estimate makespan, assign drones (F5)."""
+"""Routing layer: build candidates, estimate bounds, own the routing policy (F5)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from flyin.routing.estimator import (
     route_bound,
 )
 from flyin.routing.route_builder import MAX_ROUTES, RouteBuilder, cap_route_count
+from flyin.routing.scheduler import Scheduler
 
 __all__ = [
     "Allocator",
@@ -17,6 +18,7 @@ __all__ = [
     "UNBOUNDED",
     "MakespanEstimator",
     "RouteBuilder",
+    "Scheduler",
     "bottleneck_capacity",
     "cap_route_count",
     "route_bound",

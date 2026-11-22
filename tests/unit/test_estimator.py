@@ -21,6 +21,7 @@ from flyin.routing.estimator import (
     route_bound,
 )
 from flyin.routing.route_builder import RouteBuilder
+from flyin.routing.scheduler import Scheduler
 from flyin.simulation.simulator import Simulation
 
 MAP_FILES = sorted(
@@ -75,9 +76,9 @@ def test_estimate_rejects_invalid_inputs(
 
 
 def test_fleet_bound_returns_zero_when_there_is_nothing_to_assign() -> None:
-    estimator = MakespanEstimator()
-    assert estimator.fleet_bound(Graph(), [], 3) == 0
-    assert estimator.fleet_bound(Graph(), [], 0) == 0
+    scheduler = Scheduler()
+    assert scheduler.fleet_bound(Graph(), [], 3) == 0
+    assert scheduler.fleet_bound(Graph(), [], 0) == 0
 
 
 def test_fleet_bound_is_the_structural_bound_on_a_single_route() -> None:
@@ -89,7 +90,7 @@ def test_fleet_bound_is_the_structural_bound_on_a_single_route() -> None:
     graph.add_connection(Connection(a="mid", b="goal", cap=5))
     route = Path(zones=("start", "mid", "goal"), cost=2)
 
-    assert MakespanEstimator().fleet_bound(graph, [route], 4) == 5
+    assert Scheduler().fleet_bound(graph, [route], 4) == 5
 
 
 def test_fleet_bound_on_easy02_is_four_turns() -> None:
@@ -98,7 +99,7 @@ def test_fleet_bound_on_easy02_is_four_turns() -> None:
         parsed.graph, parsed.start, parsed.end, k=4, nb_drones=parsed.nb_drones
     )
 
-    assert MakespanEstimator().fleet_bound(parsed.graph, routes, parsed.nb_drones) == 4
+    assert Scheduler().fleet_bound(parsed.graph, routes, parsed.nb_drones) == 4
 
 
 # --- route_bound: la fórmula de la cota, dueña única --------------------

@@ -1,9 +1,9 @@
 """Command-line entry point (REQ-CLI-1).
 
-The CLI accepts a map file, builds the F5 route plan (k candidate routes -> best subset ->
-greedy ETA assignment, Propuesta A) and simulates it, printing the official per-turn lines to
-stdout. `--visual` adds a colored panel on stderr without touching stdout. The independent F7
-validator is not wired yet.
+The CLI accepts a map file, asks the `Scheduler` for the fleet (routing policy:
+k candidates -> best subset -> ETA assignment, Propuesta A) and simulates it,
+printing the official per-turn lines to stdout. `--visual` adds a colored panel
+on stderr without touching stdout. The independent F7 validator is not wired yet.
 """
 
 from __future__ import annotations
@@ -13,30 +13,13 @@ import sys
 from collections.abc import Callable
 from pathlib import Path
 
-from flyin.domain.drone import Drone, make_fleet
+from flyin.domain.drone import Drone
 from flyin.parsing.errors import MapError
 from flyin.parsing.input_rules import load_map
 from flyin.parsing.parser import ParsedMap
 from flyin.rendering.renderer import Renderer
-from flyin.routing.allocator import Allocator, assign_routes
-from flyin.routing.estimator import MakespanEstimator
-from flyin.routing.route_builder import RouteBuilder
+from flyin.routing.scheduler import Scheduler
 from flyin.simulation.simulator import Simulation
-
-
-def _build_fleet(parsed: ParsedMap) -> list[Drone]:
-    """F5.1-F5.5: build the fleet from the best route subset (Propuesta A).
-
-    Pipeline: RouteBuilder -> MakespanEstimator -> Allocator -> assign per-drone routes.
-    """
-    routes = RouteBuilder().build_for_fleet(
-        parsed.graph, parsed.start, parsed.end, k=4, nb_drones=parsed.nb_drones
-    )
-    chosen = MakespanEstimator().select_routes(
-        parsed.graph, routes, parsed.nb_drones
-    )
-    assignment = Allocator().assign(parsed.graph, chosen, parsed.nb_drones)
-    return assign_routes(make_fleet(parsed.nb_drones, parsed.start), assignment)
 
 
 def _run_propuesta_a(
@@ -82,7 +65,9 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        fleet = _build_fleet(parsed)
+        fleet = Scheduler().plan(
+            parsed.graph, parsed.start, parsed.end, parsed.nb_drones
+        )
         renderer = (
             Renderer(parsed.graph, fleet, stream=sys.stderr) if args.visual else None
         )

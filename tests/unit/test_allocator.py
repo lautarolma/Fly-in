@@ -17,6 +17,7 @@ from flyin.pathfinding.dijkstra import DijkstraPathFinder
 from flyin.routing.allocator import Allocator, assign_routes, assign_single_route
 from flyin.routing.estimator import MakespanEstimator, bottleneck_capacity
 from flyin.routing.route_builder import RouteBuilder
+from flyin.routing.scheduler import Scheduler
 from flyin.simulation.simulator import Simulation
 
 MANDATORY_MAPS = sorted(
@@ -243,7 +244,7 @@ def _reparto(parsed: ParsedMap) -> _Reparto:
     candidates = RouteBuilder().build_for_fleet(
         graph, parsed.start, parsed.end, k=4, nb_drones=nb
     )
-    routes = MakespanEstimator().select_routes(graph, candidates, nb)
+    routes = Scheduler().select_routes(graph, candidates, nb)
     assignment = Allocator().assign(graph, routes, nb)
     fleet = assign_routes(make_fleet(nb, parsed.start), assignment)
     return _Reparto(

@@ -298,3 +298,35 @@ def test_run_notifies_observer_per_emitted_turn() -> None:
     )
     assert lines == ["D1-end"]
     assert seen == [(1, "D1-end")]
+
+
+def test_proposals_are_ordered_by_steps_to_end_then_numeric_id() -> None:
+    """F6.2: el arbitraje evalúa primero al dron más cerca del goal, luego por id."""
+    graph = _graph(
+        Zone("start", 0, 0, cap=None),
+        Zone("near", 1, 0, cap=None),
+        Zone("far", 1, 1, cap=None),
+        Zone("end", 2, 0, cap=None),
+        links=(
+            ("start", "near", 1),
+            ("start", "far", 1),
+            ("near", "end", 1),
+            ("far", "end", 1),
+        ),
+    )
+    drones = [
+        Drone(id="D1", route=("start", "far", "end")),
+        Drone(id="D10", route=("start", "near", "end")),
+        Drone(id="D3", route=("start", "near", "end")),
+        Drone(id="D2", route=("start", "near", "end")),
+    ]
+    distances = {"end": 0, "near": 2, "start": 9, "far": 5}
+
+    proposals = Simulation(graph, drones, "end")._proposals(distances)
+
+    assert [proposal.drone_id for proposal in proposals] == [
+        "D2",
+        "D3",
+        "D10",
+        "D1",
+    ]

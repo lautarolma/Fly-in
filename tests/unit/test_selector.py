@@ -13,6 +13,7 @@ from flyin.parsing.parser import parse_map
 from flyin.pathfinding.base import Path
 from flyin.routing.estimator import MakespanEstimator, bottleneck_capacity
 from flyin.routing.route_builder import RouteBuilder
+from flyin.routing.scheduler import Scheduler
 
 
 def _graph() -> Graph:
@@ -42,19 +43,19 @@ def _bound(graph: Graph, routes: list[Path], nb_drones: int) -> int:
 
 
 def test_select_returns_empty_without_candidates() -> None:
-    assert MakespanEstimator().select_routes(_graph(), [], 4) == []
+    assert Scheduler().select_routes(_graph(), [], 4) == []
 
 
 def test_select_returns_empty_without_drones() -> None:
     graph = _graph()
     routes = [_route(graph, "a", cost=3, cap=1)]
 
-    assert MakespanEstimator().select_routes(graph, routes, 0) == []
+    assert Scheduler().select_routes(graph, routes, 0) == []
 
 
 def test_select_rejects_negative_fleet() -> None:
     with pytest.raises(ValueError):
-        MakespanEstimator().select_routes(_graph(), [], -1)
+        Scheduler().select_routes(_graph(), [], -1)
 
 
 def test_select_rejects_an_unbounded_candidate_set() -> None:
@@ -62,14 +63,14 @@ def test_select_rejects_an_unbounded_candidate_set() -> None:
     routes = [_route(graph, str(index), cost=2, cap=1) for index in range(5)]
 
     with pytest.raises(ValueError):
-        MakespanEstimator().select_routes(graph, routes, 4)
+        Scheduler().select_routes(graph, routes, 4)
 
 
 def test_select_with_a_single_candidate() -> None:
     graph = _graph()
     route = _route(graph, "a", cost=3, cap=1)
 
-    assert MakespanEstimator().select_routes(graph, [route], 2) == [route]
+    assert Scheduler().select_routes(graph, [route], 2) == [route]
 
 
 def test_select_adds_a_route_when_the_bound_drops() -> None:
@@ -79,7 +80,7 @@ def test_select_adds_a_route_when_the_bound_drops() -> None:
 
     assert _bound(graph, [first], 4) == 6
     assert _bound(graph, [first, second], 4) == 4
-    assert MakespanEstimator().select_routes(graph, [first, second], 4) == [
+    assert Scheduler().select_routes(graph, [first, second], 4) == [
         first,
         second,
     ]
@@ -91,7 +92,7 @@ def test_select_prefers_fewer_routes_on_a_tie() -> None:
     second = _route(graph, "b", cost=3, cap=1)
 
     assert _bound(graph, [first], 1) == _bound(graph, [first, second], 1)
-    assert MakespanEstimator().select_routes(graph, [first, second], 1) == [first]
+    assert Scheduler().select_routes(graph, [first, second], 1) == [first]
 
 
 def test_select_discards_a_route_that_raises_the_bound() -> None:
@@ -99,7 +100,7 @@ def test_select_discards_a_route_that_raises_the_bound() -> None:
     fast = _route(graph, "a", cost=3, cap=1)
     slow = _route(graph, "b", cost=10, cap=1)
 
-    assert MakespanEstimator().select_routes(graph, [fast, slow], 2) == [fast]
+    assert Scheduler().select_routes(graph, [fast, slow], 2) == [fast]
 
 
 def test_select_accounts_for_capacity_not_only_cost() -> None:
@@ -107,14 +108,14 @@ def test_select_accounts_for_capacity_not_only_cost() -> None:
     narrow = _route(graph, "narrow", cost=3, cap=1)
     wide = _route(graph, "wide", cost=3, cap=4)
 
-    assert MakespanEstimator().select_routes(graph, [narrow, wide], 8) == [wide]
+    assert Scheduler().select_routes(graph, [narrow, wide], 8) == [wide]
 
 
 def test_select_never_uses_more_routes_than_drones() -> None:
     graph = _graph()
     routes = [_route(graph, label, cost=2, cap=1) for label in "abcd"]
 
-    chosen = MakespanEstimator().select_routes(graph, routes, 2)
+    chosen = Scheduler().select_routes(graph, routes, 2)
 
     assert 0 < len(chosen) <= 2
 
@@ -126,10 +127,10 @@ def test_select_is_deterministic_and_preserves_candidate_order() -> None:
         _route(graph, "b", cost=3, cap=2),
         _route(graph, "c", cost=3, cap=1),
     ]
-    estimator = MakespanEstimator()
+    scheduler = Scheduler()
 
-    first = estimator.select_routes(graph, routes, 5)
-    assert first == estimator.select_routes(graph, routes, 5)
+    first = scheduler.select_routes(graph, routes, 5)
+    assert first == scheduler.select_routes(graph, routes, 5)
     assert first == [route for route in routes if route in first]
 
 
@@ -140,7 +141,7 @@ def test_selection_never_worsens_the_bound_on_a_real_map() -> None:
     )
     assert candidates
 
-    chosen = MakespanEstimator().select_routes(
+    chosen = Scheduler().select_routes(
         parsed.graph, candidates, parsed.nb_drones
     )
 
