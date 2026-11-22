@@ -13,7 +13,7 @@ from flyin.domain.zone import Zone, ZoneType
 from flyin.parsing.input_rules import load_map
 from flyin.pathfinding.dijkstra import DijkstraPathFinder
 from flyin.simulation.reservation_table import ReservationTable
-from flyin.simulation.simulator import Simulation
+from flyin.simulation.simulator import DeadlockError, Simulation
 from tests.trace import assert_trace_respects_caps
 
 
@@ -40,11 +40,12 @@ def test_single_normal_move_delivers_in_one_turn() -> None:
     assert drone.waypoint_index == 1
 
 
-def test_deadlock_emits_no_empty_line() -> None:
-    """Sin movimientos y sin tránsito: corte limpio (I9)."""
+def test_deadlock_emits_clear_exception() -> None:
+    """Sin movimientos y sin tránsito con drones pendientes: DeadlockError (I9)."""
     graph = _graph(Zone("start", 0, 0, cap=None), Zone("end", 1, 0, cap=None))
     drone = Drone(id="D1", route=("start", "end"))
-    assert Simulation(graph, [drone], "end").run() == []
+    with pytest.raises(DeadlockError):
+        Simulation(graph, [drone], "end").run()
     assert not drone.is_delivered
 
 
@@ -184,8 +185,8 @@ def test_arrival_reserved_at_departure() -> None:
         Drone(id="D1", route=("start", "tunnel")),
         Drone(id="D2", route=("start", "tunnel")),
     ]
-    lines = Simulation(graph, drones, "tunnel").run()
-    assert lines == ["D1-start-tunnel", "D1-tunnel"]
+    with pytest.raises(DeadlockError):
+        Simulation(graph, drones, "tunnel").run()
     assert drones[0].is_delivered
     assert not drones[1].is_delivered
 
@@ -298,6 +299,22 @@ def test_run_notifies_observer_per_emitted_turn() -> None:
     )
     assert lines == ["D1-end"]
     assert seen == [(1, "D1-end")]
+
+
+def test_deadlock_with_delivered_drone_blocking() -> None:
+    """D1 se entrega en mid (cap 1) y D2 nunca puede entrar: deadlock."""
+    graph = _graph(
+        Zone("start", 0, 0, cap=None),
+        Zone("mid", 1, 0, cap=1),
+        links=(("start", "mid", 1),),
+    )
+    drones = [
+        Drone(id="D1", route=("start", "mid")),
+        Drone(id="D2", route=("start", "mid")),
+    ]
+    with pytest.raises(DeadlockError):
+        Simulation(graph, drones, "mid").run()
+    assert not drones[1].is_delivered
 
 
 def test_proposals_are_ordered_by_steps_to_end_then_numeric_id() -> None:

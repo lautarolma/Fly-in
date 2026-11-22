@@ -12,6 +12,11 @@ from flyin.rendering.formatter import format_turn, move_token, transit_token
 from flyin.simulation.reservation_table import LinkKey, ReservationTable
 
 
+class DeadlockError(RuntimeError):
+    """El schedule no puede avanzar: hay drones sin entregar pero ningún
+    movimiento posible y nada en tránsito (I9 convertido en excepción)."""
+
+
 @dataclass(frozen=True, slots=True)
 class MovementProposal:
     """A single drone's intent for the current turn, ordered by `steps_to_end`."""
@@ -68,7 +73,12 @@ class Simulation:
                 drone.state is DroneState.IN_TRANSIT for drone in self.drones
             )
             if not events and not in_transit:
-                break  # I9: deadlock, no empty line and no infinite loop.
+                stuck = sorted(
+                    drone.id for drone in self.drones if not drone.is_delivered
+                )
+                raise DeadlockError(
+                    f"Deadlock at turn {turn}: drones {stuck} cannot advance"
+                )
             if events:
                 ordered = sorted(events, key=lambda event: _id_key(event[0]))
                 line = format_turn([token for _id, token in ordered])
