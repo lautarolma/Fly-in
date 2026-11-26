@@ -1,4 +1,4 @@
-"""End-to-end coverage over the official easy maps: CLI → plan → simulate → trace."""
+"""End-to-end coverage over the 9 mandatory maps: CLI → plan → simulate → trace."""
 
 from __future__ import annotations
 
@@ -10,20 +10,24 @@ from flyin.cli import main
 from flyin.parsing.input_rules import load_map
 from tests.trace import assert_trace_respects_caps
 
-EASY_MAPS = ("01_linear_path.txt", "02_simple_fork.txt", "03_basic_capacity.txt")
+MANDATORY_MAPS = sorted(
+    path.relative_to("maps")
+    for path in Path("maps").glob("*/*.txt")
+    if "challenger" not in path.parts
+)
 
 
-@pytest.mark.parametrize("map_name", EASY_MAPS)
-def test_easy_map_runs_and_respects_caps(
-    map_name: str,
+@pytest.mark.parametrize("map_path", MANDATORY_MAPS)
+def test_mandatory_map_runs_and_respects_caps(
+    map_path: Path,
     maps_dir: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """F3.5/F3.6: el CLI entrega la flota y la traza no viola capacidades."""
-    map_path = maps_dir / "easy" / map_name
-    parsed = load_map(map_path)
+    """F3.5/F3.6/F5: el CLI entrega la flota y la traza no viola capacidades."""
+    map_file = maps_dir / map_path
+    parsed = load_map(map_file)
 
-    assert main([str(map_path)]) == 0
+    assert main([str(map_file)]) == 0
     captured = capsys.readouterr()
     assert captured.err == ""
     lines = captured.out.splitlines()
