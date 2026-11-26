@@ -84,13 +84,11 @@ class Scheduler:
     def fleet_bound(
         self, graph: Graph, routes: list[Path], nb_drones: int
     ) -> int:
-        """Return the makespan lower bound for the whole fleet over `routes`.
+        """Return a lower-bound estimate of turns for the fleet to arrive.
 
-        Chooses the admissible subset with the lowest bound (`select_routes`)
-        and returns that bound. This is the fleet-level expression of the
-        structural bound `makespan >= c + ceil(N / cap) - 1`, i.e. the number
-        the allocator acts on and the number compared against the measured
-        makespan. Returns 0 when there is nothing to assign.
+        Selects routes for the fleet, balances the drones across them, and
+        passes each route's cost, assigned drone count, and bottleneck capacity
+        to the estimator. Returns 0 if there are no routes to assign drones to.
         """
         chosen = self.select_routes(graph, routes, nb_drones)
         if not chosen:
@@ -102,6 +100,6 @@ class Scheduler:
 
     @staticmethod
     def _balanced_loads(nb_drones: int, route_count: int) -> list[int]:
-        """Split the fleet, giving the remainder to the first routes."""
+        """Split the fleet, giving the remainder to the first routes(Euclidean division)."""
         base, extra = divmod(nb_drones, route_count)
         return [base + (1 if index < extra else 0) for index in range(route_count)]

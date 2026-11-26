@@ -62,11 +62,22 @@ class MakespanEstimator:
         loads: list[int],
         capacities: list[int],
     ) -> int:
-        """Return `max(route_bound(cost_i, load_i, cap_i))`.
+        """Estimate the minimum number of turns the fleet could need to finish.
 
-        With `cap_i = 1` this is the lem-in bound. Larger capacities let
-        drones enter in parallel, so the injection term shrinks. Routes with
-        no assigned drones contribute nothing. Never simulates.
+        Args:
+            route_costs: Cost of traveling each route.
+            loads: Number of drones assigned to each route.
+            capacities: Number of drones that can move along each route per
+                turn, limited by its narrowest point. Entries with the same
+                index describe the same route.
+
+        Returns:
+            The highest estimate among the routes. The fleet is not finished
+            until the drones on its slowest route arrive. A route with no drones
+            adds no time; if there are no routes, this returns 0.
+
+        This is an estimate, not a simulation: it does not move drones turn by
+        turn. All three lists must have the same length.
         """
         if not len(route_costs) == len(loads) == len(capacities):
             raise ValueError("route_costs, loads and capacities must align")
