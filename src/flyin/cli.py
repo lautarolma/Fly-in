@@ -4,7 +4,7 @@ The CLI accepts a map file, asks the `Scheduler` for the best validated fleet
 (routing policy: k candidates -> best valid subset -> ETA assignment, F6.4) and
 prints that schedule's official per-turn lines to stdout. `--visual` re-simulates
 only the winning fleet with a colored panel on stderr, so failed retries never
-render. The independent F7 validator is not wired yet.
+render. The independent F7 validator gates stdout before any line is printed.
 """
 
 from __future__ import annotations
@@ -21,6 +21,7 @@ from flyin.parsing.parser import ParsedMap
 from flyin.rendering.renderer import Renderer
 from flyin.routing.scheduler import Scheduler
 from flyin.simulation.simulator import Simulation
+from flyin.validation import ScheduleError, Validator
 
 
 def _run_propuesta_a(
@@ -79,6 +80,10 @@ def main(argv: list[str] | None = None) -> int:
             # Re-simulate only the winner to paint; stdout uses the validated lines.
             _run_propuesta_a(parsed, validated.fleet, on_turn)
         lines = validated.lines
+        Validator(parsed).validate(lines)
+    except ScheduleError as exc:
+        print(f"error: invalid schedule: {exc}", file=sys.stderr)
+        return 1
     except (ValueError, RuntimeError, KeyError) as exc:
         print(f"error: cannot simulate map: {exc}", file=sys.stderr)
         return 1

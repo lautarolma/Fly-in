@@ -2,6 +2,6 @@
 
 from __future__ import annotations
 
-from flyin.validation.validator import Validator
+from flyin.validation.validator import ScheduleError, Validator
 
-__all__ = ["Validator"]
+__all__ = ["ScheduleError", "Validator"]
