@@ -1,9 +1,10 @@
 """Command-line entry point (REQ-CLI-1).
 
-The CLI accepts a map file, asks the `Scheduler` for the fleet (routing policy:
-k candidates -> best subset -> ETA assignment, Propuesta A) and simulates it,
-printing the official per-turn lines to stdout. `--visual` adds a colored panel
-on stderr without touching stdout. The independent F7 validator is not wired yet.
+The CLI accepts a map file, asks the `Scheduler` for the best validated fleet
+(routing policy: k candidates -> best valid subset -> ETA assignment, F6.4) and
+prints that schedule's official per-turn lines to stdout. `--visual` re-simulates
+only the winning fleet with a colored panel on stderr, so failed retries never
+render. The independent F7 validator is not wired yet.
 """
 
 from __future__ import annotations
@@ -65,14 +66,19 @@ def main(argv: list[str] | None = None) -> int:
         return 1
 
     try:
-        fleet = Scheduler().plan(
+        validated = Scheduler().plan_validated(
             parsed.graph, parsed.start, parsed.end, parsed.nb_drones
         )
         renderer = (
-            Renderer(parsed.graph, fleet, stream=sys.stderr) if args.visual else None
+            Renderer(parsed.graph, validated.fleet, stream=sys.stderr)
+            if args.visual
+            else None
         )
         on_turn = renderer.render if renderer is not None else None
-        lines = _run_propuesta_a(parsed, fleet, on_turn)
+        if on_turn is not None:
+            # Re-simulate only the winner to paint; stdout uses the validated lines.
+            _run_propuesta_a(parsed, validated.fleet, on_turn)
+        lines = validated.lines
     except (ValueError, RuntimeError, KeyError) as exc:
         print(f"error: cannot simulate map: {exc}", file=sys.stderr)
         return 1

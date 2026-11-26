@@ -69,7 +69,7 @@ def test_cli_pipeline_error_exit_nonzero(
     def boom(_self: object, *args: object) -> list[object]:
         raise error
 
-    monkeypatch.setattr("flyin.cli.Scheduler.plan", boom)
+    monkeypatch.setattr("flyin.cli.Scheduler.plan_validated", boom)
     assert main([str(EASY_01)]) == 1
     captured = capsys.readouterr()
     assert captured.out == ""
